@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ChatGPT 代理充值控制台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Bricolage+Grotesque:wght@500;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg-0: #0b0d10;
+    --bg-1: #11151a;
+    --bg-2: #161b22;
+    --line: #20262e;
+    --line-soft: #1a1f26;
+    --fg: #d8e1ec;
+    --fg-dim: #8a96a6;
+    --fg-faint: #4f5a69;
+    --accent: #c9ff5e;          /* 主色:荧光黄绿 */
+    --accent-soft: rgba(201,255,94,0.12);
+    --info: #6fb3ff;
+    --warn: #ffb347;
+    --err: #ff5d6c;
+    --ok: #58e0a5;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg-0);
+    color: var(--fg);
+    font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 13px;
+    line-height: 1.55;
+    min-height: 100vh;
+  }
+  body {
+    background-image:
+      radial-gradient(1200px 800px at 110% -10%, rgba(201,255,94,0.06), transparent 60%),
+      radial-gradient(900px 600px at -10% 110%, rgba(111,179,255,0.05), transparent 60%);
+  }
+
+  /* ----------- 顶栏 ----------- */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(11,13,16,0.85);
+    backdrop-filter: blur(8px);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .brand-mark {
+    width: 28px; height: 28px;
+    background: var(--accent);
+    color: #0b0d10;
+    display: flex; align-items: center; justify-content: center;
+    font-family: "Bricolage Grotesque", sans-serif;
+    font-weight: 800;
+    border-radius: 6px;
+    transform: rotate(-4deg);
+  }
+  .brand-name {
+    font-family: "Bricolage Grotesque", sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: 0.3px;
+  }
+  .brand-sub {
+    font-size: 11px;
+    color: var(--fg-dim);
+    margin-left: 8px;
+  }
+  .topbar .meta {
+    display: flex; gap: 18px; align-items: center;
+    font-size: 11px; color: var(--fg-dim);
+  }
+  .meta .dot {
+    display: inline-block; width: 7px; height: 7px;
+    background: var(--ok); border-radius: 50%;
+    margin-right: 6px;
+    box-shadow: 0 0 8px var(--ok);
+  }
+
+  /* ----------- 布局 ----------- */
+  main {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    gap: 0;
+    min-height: calc(100vh - 57px);
+  }
+  @media (max-width: 980px) {
+    main { grid-template-columns: 1fr; }
+  }
+  .pane {
+    padding: 24px 28px 80px;
+  }
+  .pane-left {
+    border-right: 1px solid var(--line);
+  }
+
+  /* ----------- 选项卡 ----------- */
+  .tabs {
+    display: flex; gap: 2px;
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 4px;
+    margin-bottom: 22px;
+  }
+  .tab {
+    flex: 1;
+    padding: 9px 12px;
+    text-align: center;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--fg-dim);
+    border-radius: 6px;
+    transition: all .15s;
+    user-select: none;
+    border: none;
+    background: transparent;
+    font-family: inherit;
+  }
+  .tab:hover { color: var(--fg); }
+  .tab.active {
+    background: var(--accent);
+    color: #0b0d10;
+    font-weight: 700;
+  }
+
+  /* ----------- 表单 ----------- */
+  .field {
+    margin-bottom: 18px;
+  }
+  .field label {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 11px;
+    color: var(--fg-dim);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+  }
+  .field label .hint {
+    color: var(--fg-faint);
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 11px;
+  }
+  .input, .textarea {
+    width: 100%;
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    color: var(--fg);
+    padding: 11px 13px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .input:focus, .textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .textarea {
+    min-height: 220px;
+    resize: vertical;
+    line-height: 1.5;
+  }
+
+  /* ----------- 按钮 ----------- */
+  .btn-row {
+    display: flex; gap: 10px; flex-wrap: wrap;
+    margin-top: 14px;
+  }
+  .btn {
+    padding: 11px 18px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--bg-1);
+    color: var(--fg);
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all .15s;
+    font-weight: 500;
+  }
+  .btn:hover { border-color: var(--fg-dim); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn.primary {
+    background: var(--accent);
+    color: #0b0d10;
+    border-color: var(--accent);
+    font-weight: 700;
+  }
+  .btn.primary:hover { filter: brightness(1.1); }
+  .btn.ghost { background: transparent; }
+
+  /* ----------- 终端 / 日志 ----------- */
+  .terminal {
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    height: calc(100vh - 130px);
+    min-height: 500px;
+  }
+  .terminal-head {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--bg-2);
+  }
+  .terminal-head .title {
+    font-size: 11px;
+    color: var(--fg-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .terminal-head .dots {
+    display: flex; gap: 6px;
+  }
+  .terminal-head .dots span {
+    width: 11px; height: 11px; border-radius: 50%;
+    background: var(--line);
+  }
+  .terminal-head .dots span:nth-child(1) { background: #ff5d6c; }
+  .terminal-head .dots span:nth-child(2) { background: #ffb347; }
+  .terminal-head .dots span:nth-child(3) { background: #58e0a5; }
+  .terminal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 16px;
+    font-size: 12.5px;
+  }
+  .log-line {
+    margin-bottom: 4px;
+    word-break: break-all;
+    white-space: pre-wrap;
+  }
+  .log-line .ts {
+    color: var(--fg-faint);
+    margin-right: 8px;
+  }
+  .log-line .tag {
+    display: inline-block;
+    padding: 0 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    margin-right: 8px;
+    letter-spacing: 0.5px;
+  }
+  .log-line.info  .tag { background: rgba(111,179,255,0.18); color: var(--info); }
+  .log-line.ok    .tag { background: rgba(88,224,165,0.18);  color: var(--ok); }
+  .log-line.warn  .tag { background: rgba(255,179,71,0.18);  color: var(--warn); }
+  .log-line.err   .tag { background: rgba(255,93,108,0.18);  color: var(--err); }
+  .log-line.cmd   .tag { background: var(--accent-soft);     color: var(--accent); }
+  .log-line.json {
+    background: var(--bg-2);
+    border: 1px solid var(--line-soft);
+    padding: 10px 12px;
+    border-radius: 5px;
+    margin: 6px 0;
+    color: #b8c5d3;
+  }
+
+  /* ----------- 历史记录 ----------- */
+  .history-list {
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .history-item {
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 12px 14px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 10px 14px;
+    align-items: center;
+    font-size: 12px;
+  }
+  .history-item .pill {
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+  .pill.success  { background: rgba(88,224,165,0.18);  color: var(--ok); }
+  .pill.failed   { background: rgba(255,93,108,0.18);  color: var(--err); }
+  .pill.pending  { background: rgba(255,179,71,0.18);  color: var(--warn); }
+  .pill.queried  { background: rgba(111,179,255,0.18); color: var(--info); }
+  .history-item .code {
+    color: var(--fg);
+    font-weight: 500;
+  }
+  .history-item .when {
+    color: var(--fg-dim);
+    font-size: 11px;
+  }
+  .history-actions {
+    display: flex; gap: 6px;
+  }
+  .history-actions button {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--fg-dim);
+    font-family: inherit;
+    font-size: 11px;
+    padding: 4px 9px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .history-actions button:hover { color: var(--fg); border-color: var(--fg-dim); }
+
+  .empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--fg-faint);
+    font-size: 12px;
+  }
+
+  /* ----------- 小细节 ----------- */
+  .section-title {
+    font-family: "Bricolage Grotesque", sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    margin: 0 0 6px 0;
+    letter-spacing: -0.3px;
+  }
+  .section-desc {
+    font-size: 12px;
+    color: var(--fg-dim);
+    margin-bottom: 22px;
+  }
+  .kbd {
+    display: inline-block;
+    padding: 1px 6px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    font-size: 11px;
+    color: var(--fg-dim);
+  }
+
+  /* 滚动条 */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--fg-faint); }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  /* 闪烁的光标 */
+  .blink::after {
+    content: "▎";
+    color: var(--accent);
+    animation: blink 1s steps(2, start) infinite;
+    margin-left: 4px;
+  }
+  @keyframes blink { to { visibility: hidden; } }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark">G</div>
+    <div>
+      <div class="brand-name">RECHARGE.CONSOLE</div>
+    </div>
+    <span class="brand-sub">// ChatGPT Plus / Pro / Pro Lite 代理充值</span>
+  </div>
+  <div class="meta">
+    <span><span class="dot"></span>proxy online</span>
+    <span id="server-meta">checking...</span>
+  </div>
+</header>
+
+<main>
+  <!-- 左栏:操作区 -->
+  <section class="pane pane-left">
+    <h1 class="section-title">操作面板</h1>
+    <p class="section-desc">所有调用都走本地中间层,API Key 仅在服务端持有,不会泄漏到浏览器。</p>
+
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-tab="recharge">充值</button>
+      <button class="tab" data-tab="validate">校验</button>
+      <button class="tab" data-tab="query">查询</button>
+      <button class="tab" data-tab="history">历史</button>
+    </div>
+
+    <!-- Tab: 充值 -->
+    <div class="tab-panel" data-panel="recharge">
+      <div class="field">
+        <label>
+          激活码
+          <span class="hint">GPLUS- / GP20X- / GP5X-</span>
+        </label>
+        <input class="input" id="rc-code" placeholder="例:GP20X-XXXX-XXXX-XXXX" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label>
+          ChatGPT 账号 JSON
+          <span class="hint">必须包含 account.id 和 accessToken</span>
+        </label>
+        <textarea class="textarea" id="rc-json" placeholder='{
+  "user":   { "id": "user-xxx", "email": "abc@gmail.com" },
+  "account":{ "id": "acct-uuid", "planType": "free" },
+  "accessToken": "eyJhbGci..."
+}'></textarea>
+      </div>
+      <div class="btn-row">
+        <button class="btn primary" id="btn-recharge">▶ 开始充值</button>
+        <button class="btn ghost" id="btn-validate-all">先校验</button>
+        <button class="btn ghost" id="btn-clear-form">清空</button>
+      </div>
+    </div>
+
+    <!-- Tab: 校验 -->
+    <div class="tab-panel" data-panel="validate" hidden>
+      <div class="field">
+        <label>仅校验激活码格式</label>
+        <input class="input" id="vc-code" placeholder="GP20X-XXXX-XXXX-XXXX" autocomplete="off" />
+      </div>
+      <div class="btn-row" style="margin-bottom: 24px;">
+        <button class="btn primary" id="btn-validate-code">✓ 校验激活码</button>
+      </div>
+
+      <div class="field">
+        <label>仅校验 user_data JSON</label>
+        <textarea class="textarea" id="vj-json" placeholder="把整段账号 JSON 粘进来"></textarea>
+      </div>
+      <div class="btn-row">
+        <button class="btn primary" id="btn-validate-json">✓ 校验 JSON</button>
+      </div>
+    </div>
+
+    <!-- Tab: 查询 -->
+    <div class="tab-panel" data-panel="query" hidden>
+      <div class="field">
+        <label>
+          激活码
+          <span class="hint">通过复用接口幂等查询当前状态</span>
+        </label>
+        <input class="input" id="qy-code" placeholder="GP20X-XXXX-XXXX-XXXX" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label>
+          accessToken
+          <span class="hint">可选,老数据需要补</span>
+        </label>
+        <input class="input" id="qy-token" placeholder="eyJhbGci..." autocomplete="off" />
+      </div>
+      <div class="btn-row">
+        <button class="btn primary" id="btn-query">⌕ 查询状态</button>
+      </div>
+    </div>
+
+    <!-- Tab: 历史 -->
+    <div class="tab-panel" data-panel="history" hidden>
+      <p class="section-desc" style="margin-bottom: 16px;">
+        历史记录保存在 <span class="kbd">localStorage</span> 中,清空浏览器数据会丢失。
+      </p>
+      <div id="history-container" class="history-list"></div>
+      <div class="btn-row" style="margin-top: 22px;">
+        <button class="btn ghost" id="btn-export">导出 JSON</button>
+        <button class="btn ghost" id="btn-clear-history">清空历史</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 右栏:终端 -->
+  <section class="pane">
+    <div class="terminal">
+      <div class="terminal-head">
+        <div class="dots"><span></span><span></span><span></span></div>
+        <div class="title">live · output</div>
+        <button class="btn ghost" id="btn-clear-log" style="padding:4px 10px;font-size:11px;">clear</button>
+      </div>
+      <div class="terminal-body" id="terminal">
+        <div class="log-line info"><span class="ts">--:--:--</span><span class="tag">SYSTEM</span>等待操作。粘贴卡密和 JSON 后点 <span class="kbd">▶ 开始充值</span></div>
+        <div class="log-line cmd"><span class="ts">--:--:--</span><span class="tag">TIPS</span>充值过程通常 15–40 秒,内部最长可能 90 秒,不要中途刷新页面<span class="blink"></span></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+// ============================================================
+// 工具
+// ============================================================
+const $  = sel => document.querySelector(sel);
+const $$ = sel => document.querySelectorAll(sel);
+
+const term = $('#terminal');
+function pad2(n) { return String(n).padStart(2, '0'); }
+function nowTs() {
+  const d = new Date();
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+}
+function log(level, tag, msg) {
+  const line = document.createElement('div');
+  line.className = `log-line ${level}`;
+  line.innerHTML = `<span class="ts">${nowTs()}</span><span class="tag">${tag}</span>${msg}`;
+  term.appendChild(line);
+  term.scrollTop = term.scrollHeight;
+}
+function logJson(obj) {
+  const line = document.createElement('div');
+  line.className = 'log-line json';
+  line.textContent = JSON.stringify(obj, null, 2);
+  term.appendChild(line);
+  term.scrollTop = term.scrollHeight;
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+async function api(path, body) {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
+  });
+  const data = await res.json().catch(() => ({}));
+  return { httpStatus: res.status, data };
+}
+
+// ============================================================
+// Tabs
+// ============================================================
+$$('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    $$('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const target = tab.dataset.tab;
+    $$('.tab-panel').forEach(p => p.hidden = p.dataset.panel !== target);
+    if (target === 'history') renderHistory();
+  });
+});
+
+// ============================================================
+// 历史记录(localStorage)
+// ============================================================
+const HISTORY_KEY = 'recharge_history_v1';
+
+function loadHistory() {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+function saveHistory(list) {
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(list));
+}
+function pushHistory(record) {
+  const list = loadHistory();
+  list.unshift({ id: Date.now() + '-' + Math.random().toString(36).slice(2, 7), ...record });
+  // 最多保留 200 条
+  saveHistory(list.slice(0, 200));
+}
+function updateHistoryByCode(code, patch) {
+  const list = loadHistory();
+  const i = list.findIndex(r => r.activation_code === code);
+  if (i >= 0) {
+    list[i] = { ...list[i], ...patch };
+    saveHistory(list);
+  } else {
+    pushHistory({ activation_code: code, ...patch });
+  }
+}
+
+function renderHistory() {
+  const box = $('#history-container');
+  const list = loadHistory();
+  if (!list.length) {
+    box.innerHTML = '<div class="empty">暂无记录。任何一次充值或查询都会自动写入这里。</div>';
+    return;
+  }
+  box.innerHTML = list.map(r => {
+    const statusClass = ({
+      success: 'success',
+      failed: 'failed',
+      pending: 'pending',
+      queried: 'queried',
+    })[r.status] || 'queried';
+    const statusLabel = ({
+      success: '成功',
+      failed: '失败',
+      pending: '处理中',
+      queried: '已查询',
+    })[r.status] || r.status;
+    const when = new Date(r.updated_at || r.created_at || Date.now()).toLocaleString();
+    return `
+      <div class="history-item">
+        <span class="pill ${statusClass}">${statusLabel}</span>
+        <div>
+          <div class="code">${escapeHtml(r.activation_code)}</div>
+          <div class="when">${escapeHtml(r.message || '')} · ${when}</div>
+        </div>
+        <div class="history-actions">
+          <button data-act="re-query" data-code="${escapeHtml(r.activation_code)}">查询</button>
+          <button data-act="copy"      data-code="${escapeHtml(r.activation_code)}">复制</button>
+          <button data-act="del"       data-id="${r.id}">删除</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  box.querySelectorAll('button[data-act]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const act = btn.dataset.act;
+      if (act === 'del') {
+        const list = loadHistory().filter(x => x.id !== btn.dataset.id);
+        saveHistory(list);
+        renderHistory();
+      } else if (act === 'copy') {
+        navigator.clipboard.writeText(btn.dataset.code);
+        log('info', 'CLIPBOARD', `已复制 ${btn.dataset.code}`);
+      } else if (act === 're-query') {
+        $('#qy-code').value = btn.dataset.code;
+        $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'query'));
+        $$('.tab-panel').forEach(p => p.hidden = p.dataset.panel !== 'query');
+      }
+    });
+  });
+}
+
+$('#btn-clear-history').addEventListener('click', () => {
+  if (confirm('确定清空所有本地历史记录?')) {
+    saveHistory([]);
+    renderHistory();
+    log('warn', 'HISTORY', '本地历史记录已清空');
+  }
+});
+
+$('#btn-export').addEventListener('click', () => {
+  const data = JSON.stringify(loadHistory(), null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `recharge-history-${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  log('ok', 'EXPORT', '历史记录已导出');
+});
+
+// ============================================================
+// 校验:激活码
+// ============================================================
+async function doValidateCode(code) {
+  const { data } = await api('/api/validate-code', { activation_code: code });
+  if (data.ok) {
+    log('ok', 'CODE', `${data.activation_code} → 产品类型:<b style="color:var(--accent)">${data.product_label}</b>`);
+  } else {
+    log('err', 'CODE', `校验失败:${escapeHtml(data.reason || '未知错误')}`);
+  }
+  return data;
+}
+
+$('#btn-validate-code').addEventListener('click', async () => {
+  const code = $('#vc-code').value.trim();
+  if (!code) return log('warn', 'CODE', '请输入激活码');
+  log('info', 'CODE', `校验 ${code} ...`);
+  await doValidateCode(code);
+});
+
+// ============================================================
+// 校验:JSON
+// ============================================================
+async function doValidateJson(raw) {
+  const { data } = await api('/api/validate-json', { user_data: raw });
+  if (data.ok) {
+    log('ok', 'JSON', '字段齐全:');
+    logJson(data.summary);
+  } else {
+    log('err', 'JSON', `校验失败:${escapeHtml(data.reason || '未知错误')}`);
+  }
+  return data;
+}
+
+$('#btn-validate-json').addEventListener('click', async () => {
+  const raw = $('#vj-json').value.trim();
+  if (!raw) return log('warn', 'JSON', '请粘贴 user_data');
+  log('info', 'JSON', '校验中 ...');
+  await doValidateJson(raw);
+});
+
+// ============================================================
+// 充值
+// ============================================================
+$('#btn-validate-all').addEventListener('click', async () => {
+  const code = $('#rc-code').value.trim();
+  const raw  = $('#rc-json').value.trim();
+  log('info', 'PRECHECK', '开始预校验 ...');
+  if (code) await doValidateCode(code);
+  if (raw)  await doValidateJson(raw);
+});
+
+$('#btn-clear-form').addEventListener('click', () => {
+  $('#rc-code').value = '';
+  $('#rc-json').value = '';
+  log('info', 'FORM', '表单已清空');
+});
+
+$('#btn-recharge').addEventListener('click', async () => {
+  const code = $('#rc-code').value.trim();
+  const raw  = $('#rc-json').value.trim();
+  if (!code) return log('warn', 'RECHARGE', '请填写激活码');
+  if (!raw)  return log('warn', 'RECHARGE', '请粘贴 user_data JSON');
+
+  // 本地预校验
+  log('info', 'RECHARGE', `开始充值 → ${code}`);
+  const cv = await doValidateCode(code);
+  if (!cv.ok) return;
+  const jv = await doValidateJson(raw);
+  if (!jv.ok) return;
+
+  let userDataObj;
+  try { userDataObj = JSON.parse(raw); } catch { return; }
+
+  const btn = $('#btn-recharge');
+  btn.disabled = true;
+  btn.textContent = '⏳ 充值中... (最长 ~3 分钟)';
+
+  // 写一条 pending 记录
+  updateHistoryByCode(code, {
+    activation_code: code,
+    status: 'pending',
+    message: '提交中...',
+    product: cv.product_label,
+    created_at: Date.now(),
+    updated_at: Date.now(),
+  });
+
+  log('info', 'UPSTREAM', '调用 /api/recharge ...');
+  try {
+    const { data } = await api('/api/recharge', {
+      activation_code: code,
+      user_data: userDataObj,
+    });
+
+    if (data._stage === 'reuse_after_first') {
+      log('warn', 'STAGE', `首次提交命中 reuse_only,已自动切到复用接口。原因:${escapeHtml(data._first_message || '')}`);
+    } else {
+      log('info', 'STAGE', `阶段:${data._stage}`);
+    }
+
+    if (data.success) {
+      log('ok', 'RECHARGE', `<b style="color:var(--accent)">${escapeHtml(data.message || '充值成功')}</b>`);
+      logJson(data);
+      updateHistoryByCode(code, {
+        status: 'success',
+        message: data.message,
+        record_id: data?.details?.record_id || data?.data?.record_id,
+        order_id:  data?.details?.order_id  || data?.data?.order_id,
+        account_id:data?.details?.account_id,
+        raw: data,
+        updated_at: Date.now(),
+      });
+    } else {
+      log('err', 'RECHARGE', `失败:${escapeHtml(data.message || '未知错误')}`);
+      logJson(data);
+      updateHistoryByCode(code, {
+        status: 'failed',
+        message: data.message,
+        raw: data,
+        updated_at: Date.now(),
+      });
+    }
+  } catch (e) {
+    log('err', 'RECHARGE', `网络异常:${escapeHtml(e.message || String(e))}`);
+    updateHistoryByCode(code, {
+      status: 'failed',
+      message: '网络异常: ' + (e.message || e),
+      updated_at: Date.now(),
+    });
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '▶ 开始充值';
+  }
+});
+
+// ============================================================
+// 查询
+// ============================================================
+$('#btn-query').addEventListener('click', async () => {
+  const code  = $('#qy-code').value.trim();
+  const token = $('#qy-token').value.trim();
+  if (!code) return log('warn', 'QUERY', '请填写激活码');
+
+  log('info', 'QUERY', `查询 ${code} ...`);
+  const btn = $('#btn-query');
+  btn.disabled = true;
+  btn.textContent = '⏳ 查询中...';
+
+  try {
+    const { data } = await api('/api/query', {
+      activation_code: code,
+      accessToken: token || undefined,
+    });
+
+    if (data.query_ok) {
+      const tag = data.status === 'success' ? 'ok'
+                : data.status === 'not_used' ? 'info'
+                : data.status === 'not_found' ? 'err'
+                : 'warn';
+      log(tag, 'QUERY', `<b>状态: ${data.status}</b> — ${escapeHtml(data.interpreted)}`);
+      logJson(data.raw);
+
+      updateHistoryByCode(code, {
+        activation_code: code,
+        status: data.status === 'success' ? 'success'
+              : data.status === 'not_used' || data.status === 'not_found' ? 'queried'
+              : 'failed',
+        message: '[查询] ' + data.interpreted,
+        raw: data.raw,
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      });
+    } else {
+      log('err', 'QUERY', `代理异常:${escapeHtml(data.message || '')}`);
+    }
+  } catch (e) {
+    log('err', 'QUERY', `网络异常:${escapeHtml(e.message || String(e))}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⌕ 查询状态';
+  }
+});
+
+// ============================================================
+// 清屏 & 启动
+// ============================================================
+$('#btn-clear-log').addEventListener('click', () => {
+  term.innerHTML = '';
+  log('info', 'SYSTEM', '日志已清空');
+});
+
+(async () => {
+  try {
+    // 简单探活
+    const res = await fetch('/api/validate-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ activation_code: 'GP20X-PROBE' }),
+    });
+    if (res.ok) $('#server-meta').textContent = 'proxy v1.0 · ready';
+  } catch {
+    $('#server-meta').textContent = 'proxy unreachable';
+    log('err', 'SYSTEM', '无法连通本地代理服务,请检查 Node 后端是否启动');
+  }
+})();
+</script>
+</body>
+</html>
